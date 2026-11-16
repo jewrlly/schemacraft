@@ -1,6 +1,8 @@
 import { ChevronRight, Database } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link, Outlet } from 'react-router-dom'
+import { ConfirmHost } from './ConfirmDialog'
+import { Toaster } from './Toaster'
 
 /** Один пункт навігаційного шляху вгорі сторінки: текст і (необов'язково) посилання. */
 export interface Crumb {
@@ -23,6 +25,8 @@ export function AppShell() {
       <main className="flex min-h-0 flex-1 flex-col">
         <Outlet />
       </main>
+      <ConfirmHost />
+      <Toaster />
     </div>
   )
 }
