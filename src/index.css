@@ -22,3 +22,31 @@ body {
 dialog::backdrop {
     background: rgb(15 23 42 / 0.35);
 }
+
+/* Точки з'єднання біля колонок на діаграмі */
+.react-flow__handle {
+    width: 10px;
+    height: 10px;
+    border: 2px solid #fff;
+    background: #94a3b8;
+    transition: background 0.15s;
+}
+
+.react-flow__handle:hover,
+.react-flow__handle.connectingto {
+    background: #4f46e5;
+}
+
+/* На сенсорних екранах точки більші, щоб у них легше було влучити пальцем */
+@media (pointer: coarse) {
+    .react-flow__handle {
+        width: 16px;
+        height: 16px;
+    }
+}
+
+/* Виділений зв'язок — синій і товщий */
+.react-flow__edge.selected .react-flow__edge-path {
+    stroke: #4f46e5 !important;
+    stroke-width: 2.5;
+}
