@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { Column, OnDeleteAction, Project, Relation, Table } from '../types'
 import { TABLE_COLORS } from '../types'
 import { nextFreeName } from '../lib/identifiers'
+import { shopTemplate } from '../lib/templates'
 
 /** Дані для нового зв'язку: усе, крім id (його згенерує сховище). */
 export type NewRelation = Omit<Relation, 'id'>
@@ -23,7 +24,7 @@ function blankColumn(name: string): Column {
 /** Опис сховища: які дані в ньому є і які дії можна виконувати. */
 interface ProjectState {
     projects: Project[]
-    createProject: (name: string) => string
+    createProject: (name: string, withTemplate: boolean) => string
     renameProject: (id: string, name: string) => void
     deleteProject: (id: string) => void
     addTable: (projectId: string) => string | null
@@ -63,9 +64,11 @@ export const useProjectStore = create<ProjectState>()(
             return {
                 projects: [],
 
-                createProject: (name) => {
+                createProject: (name, withTemplate) => {
                     const now = Date.now()
-                    const project: Project = { id: crypto.randomUUID(), name, createdAt: now, updatedAt: now, tables: [], relations: [] }
+                    const project: Project = withTemplate
+                        ? shopTemplate(name)
+                        : { id: crypto.randomUUID(), name, createdAt: now, updatedAt: now, tables: [], relations: [] }
                     set((state) => ({ projects: [project, ...state.projects] }))
                     return project.id
                 },

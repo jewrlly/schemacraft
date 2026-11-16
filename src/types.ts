@@ -17,7 +17,7 @@ export const SQL_TYPES = [
     'JSONB',
 ] as const
 
-export type SQLType = (typeof SQL_TYPES)[number]
+export type SqlType = (typeof SQL_TYPES)[number]
 
 export const ON_DELETE_ACTIONS = ['NO ACTION', 'CASCADE', 'SET NULL', 'RESTRICT'] as const
 export type OnDeleteAction = (typeof ON_DELETE_ACTIONS)[number]
@@ -28,7 +28,7 @@ export type TableColor = (typeof TABLE_COLORS)[number]
 export interface Column {
     id: string
     name: string
-    type: SQLType
+    type: SqlType
     primaryKey: boolean
     notNull: boolean
     unique: boolean
