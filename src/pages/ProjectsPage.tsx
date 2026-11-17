@@ -4,7 +4,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { PageBar } from '../components/AppShell'
 import { Modal } from '../components/Modal'
 import { inputClass } from '../components/styles'
-import { Button, EmptyState, Field } from '../components/ui'
+import { Badge, Button, EmptyState, Field } from '../components/ui'
+import { countBySeverity, validateProject } from '../lib/validator'
 import { confirmAction } from '../store/confirmStore'
 import { useProjectStore } from '../store/projectStore'
 import { toast } from '../store/toastStore'
@@ -23,6 +24,7 @@ function validateProjectName(name: string): string | null {
 /** Картка однієї схеми у списку. */
 function ProjectCard({ project, onRename }: { project: Project; onRename: () => void }) {
   const deleteProject = useProjectStore((s) => s.deleteProject)
+  const counts = useMemo(() => countBySeverity(validateProject(project)), [project])
   const updated = new Date(project.updatedAt).toLocaleString('uk-UA', { dateStyle: 'medium', timeStyle: 'short' })
 
   const onDelete = async () => {
@@ -39,7 +41,14 @@ function ProjectCard({ project, onRename }: { project: Project; onRename: () => 
   return (
     <li className="group flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-indigo-300 hover:shadow-md">
       <Link to={`/project/${project.id}`} className="flex flex-1 flex-col gap-3 rounded-t-2xl p-5">
-        <h2 className="line-clamp-2 font-semibold break-words text-slate-900 group-hover:text-indigo-700">{project.name}</h2>
+        <div className="flex items-start justify-between gap-2">
+          <h2 className="line-clamp-2 font-semibold break-words text-slate-900 group-hover:text-indigo-700">{project.name}</h2>
+          {counts.error > 0 ? (
+            <Badge tone="red">{counts.error} помилк.</Badge>
+          ) : project.tables.length > 0 ? (
+            <Badge tone="green">без помилок</Badge>
+          ) : null}
+        </div>
         <div className="flex flex-wrap gap-3 text-sm text-slate-600">
           <span className="inline-flex items-center gap-1">
             <Table2 size={15} /> {project.tables.length} табл.

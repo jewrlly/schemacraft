@@ -33,7 +33,8 @@ import { PageBar } from '../components/AppShell'
 import { NotFound } from '../components/NotFound'
 import { TableNode, type TableNodeType } from '../components/TableNode'
 import { inputClass, tableColorClasses } from '../components/styles'
-import { Button, EmptyState } from '../components/ui'
+import { Badge, Button, EmptyState } from '../components/ui'
+import { countBySeverity, validateProject } from '../lib/validator'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { confirmAction } from '../store/confirmStore'
 import { useProject, useProjectStore } from '../store/projectStore'
@@ -381,6 +382,9 @@ export function EditorPage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [undo, redo])
 
+  const issues = useMemo(() => (project ? validateProject(project) : []), [project])
+  const counts = countBySeverity(issues)
+
   if (!project) return <NotFound what="Схему" />
 
   const onAddTable = () => {
@@ -400,8 +404,11 @@ export function EditorPage() {
               to={`/project/${project.id}/validation`}
               className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
             >
-              <AlertTriangle size={16} className="text-slate-500" />
+              <AlertTriangle size={16} className={counts.error > 0 ? 'text-rose-600' : 'text-slate-500'} />
               Перевірка
+              {counts.error + counts.warning > 0 && (
+                <Badge tone={counts.error > 0 ? 'red' : 'amber'}>{counts.error + counts.warning}</Badge>
+              )}
             </Link>
             <Link
               to={`/project/${project.id}/sql`}

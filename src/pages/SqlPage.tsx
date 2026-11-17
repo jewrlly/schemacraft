@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from 'react'
-import { ArrowLeft, Copy, Download } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Copy, Download } from 'lucide-react'
+import { countBySeverity, validateProject } from '../lib/validator'
 import { Link, useParams } from 'react-router-dom'
 import { PageBar } from '../components/AppShell'
 import { NotFound } from '../components/NotFound'
@@ -38,6 +39,7 @@ export function SqlPage() {
   const { projectId } = useParams()
   const project = useProject(projectId)
   const sql = useMemo(() => (project ? generateSql(project) : ''), [project])
+  const counts = useMemo(() => countBySeverity(project ? validateProject(project) : []), [project])
 
   if (!project) return <NotFound what="Схему" />
 
@@ -74,6 +76,15 @@ export function SqlPage() {
 
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4 sm:p-6">
+          {counts.error > 0 && (
+            <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+              <AlertTriangle size={18} className="shrink-0" />
+              <span className="flex-1">Схема має помилки ({counts.error}), тому скрипт може не виконатися в базі даних.</span>
+              <Link to={`/project/${project.id}/validation`} className="font-semibold underline underline-offset-2">
+                Переглянути помилки
+              </Link>
+            </div>
+          )}
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5 text-xs text-slate-600">
               <span>PostgreSQL · {lines.length} рядків</span>
