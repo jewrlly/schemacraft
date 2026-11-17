@@ -1,5 +1,26 @@
 @import 'tailwindcss';
 
+/* Кавова палітра: бежеве тло, кнопки й акценти кольору кави.
+   Перевизначаємо кольори Tailwind, тому всі класи indigo-*, white і slate-* змінюються автоматично. */
+@theme {
+    --color-indigo-50: #f8f3ee;
+    --color-indigo-100: #ede1d4;
+    --color-indigo-200: #dcc4ab;
+    --color-indigo-300: #c6a27f;
+    --color-indigo-400: #b0835a;
+    --color-indigo-500: #956a43;
+    --color-indigo-600: #7a5536;
+    --color-indigo-700: #62442c;
+    --color-indigo-800: #503826;
+    --color-indigo-900: #432f21;
+    --color-indigo-950: #2a1d14;
+
+    --color-white: #f9f5ee;
+    --color-slate-50: #e7ddcf;
+    --color-slate-100: #e7ddcf;
+    --color-slate-200: #d9cbb8;
+}
+
 html,
 body,
 #root {
@@ -8,13 +29,13 @@ body,
 
 body {
     margin: 0;
-    background: #f6f7fb;
+    background: #ece4d8;
     color: #1e293b;
 }
 
 /* Видимий фокус для навігації з клавіатури */
 :focus-visible {
-    outline: 2px solid #4f46e5;
+    outline: 2px solid #7a5536;
     outline-offset: 2px;
 }
 
@@ -27,14 +48,14 @@ dialog::backdrop {
 .react-flow__handle {
     width: 10px;
     height: 10px;
-    border: 2px solid #fff;
+    border: 2px solid #f9f5ee;
     background: #94a3b8;
     transition: background 0.15s;
 }
 
 .react-flow__handle:hover,
 .react-flow__handle.connectingto {
-    background: #4f46e5;
+    background: #7a5536;
 }
 
 /* На сенсорних екранах точки більші, щоб у них легше було влучити пальцем */
@@ -47,6 +68,6 @@ dialog::backdrop {
 
 /* Виділений зв'язок — синій і товщий */
 .react-flow__edge.selected .react-flow__edge-path {
-    stroke: #4f46e5 !important;
+    stroke: #7a5536 !important;
     stroke-width: 2.5;
 }
