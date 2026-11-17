@@ -26,7 +26,8 @@ function blankColumn(name: string): Column {
 /** Опис сховища: які дані в ньому є і які дії можна виконувати. */
 interface ProjectState {
     projects: Project[]
-    createProject: (name: string, withTemplate: boolean) => string
+    createProject: (name: string, withTemplate: boolean) => string   
+    addImportedProject: (project: Project) => void
     renameProject: (id: string, name: string) => void
     deleteProject: (id: string) => void
     addTable: (projectId: string) => string | null
@@ -76,6 +77,8 @@ export const useProjectStore = create<ProjectState>()(
                         set((state) => ({ projects: [project, ...state.projects] }))
                         return project.id
                     },
+
+                    addImportedProject: (project) => set((s) => ({ projects: [project, ...s.projects] })),
 
                     renameProject: (id, name) => update(id, (p) => ({ ...p, name })),
 
