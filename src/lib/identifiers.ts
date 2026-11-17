@@ -42,3 +42,38 @@ export function nextFreeName(base: string, existing: string[]): string {
         if (!lower.has(candidate)) return candidate
     }
 }
+
+/** Екранує назву для SQL: обгортає в подвійні лапки і подвоює лапки всередині. */
+export function quoteIdent(name: string): string {
+    return '"' + name.replace(/"/g, '""') + '"'
+}
+
+/** Екранує текстове значення: обгортає в одинарні лапки і подвоює одинарні лапки всередині. */
+export function quoteLiteral(value: string): string {
+    return "'" + value.replace(/'/g, "''") + "'"
+}
+
+const SAFE_DEFAULT_KEYWORDS = new Set([
+    'NULL', 'TRUE', 'FALSE', 'CURRENT_TIMESTAMP', 'CURRENT_DATE', 'NOW()', 'GEN_RANDOM_UUID()',
+])
+const NUMBER_RE = /^-?\d+(\.\d+)?$/
+
+/**
+ * Перетворює значення за замовчуванням на безпечний фрагмент SQL.
+ * Дозволені лише числа і кілька ключових слів; усе інше стає текстовим значенням у лапках,
+ * тому вставити в згенерований скрипт довільну SQL-команду неможливо.
+ */
+export function formatDefault(raw: string): string | null {
+    const value = raw.trim()
+    if (value === '') return null
+    if (NUMBER_RE.test(value)) return value
+    if (SAFE_DEFAULT_KEYWORDS.has(value.toUpperCase())) return value.toUpperCase()
+    const unquoted =
+        value.length >= 2 && value.startsWith("'") && value.endsWith("'") ? value.slice(1, -1) : value
+    return quoteLiteral(unquoted)
+}
+
+/** Прибирає з тексту переноси рядка, щоб його можна було безпечно вставити в SQL-коментар. */
+export function safeComment(text: string): string {
+    return text.replace(/[\r\n]+/g, ' ').slice(0, 200)
+}
