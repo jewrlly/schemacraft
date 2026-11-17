@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
   Background,
@@ -11,13 +11,30 @@ import {
   type Connection,
   type Edge,
 } from '@xyflow/react'
-import { AlertTriangle, Code2, Pencil, Plus, Table2, Trash2 } from 'lucide-react'
+import { useStore } from 'zustand'
+import {
+  AlertTriangle,
+  Code2,
+  KeyRound,
+  LayoutGrid,
+  Link2,
+  List,
+  Network,
+  Pencil,
+  Plus,
+  Redo2,
+  Table2,
+  Trash2,
+  Undo2,
+  Workflow,
+} from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { PageBar } from '../components/AppShell'
 import { NotFound } from '../components/NotFound'
 import { TableNode, type TableNodeType } from '../components/TableNode'
-import { inputClass } from '../components/styles'
+import { inputClass, tableColorClasses } from '../components/styles'
 import { Button, EmptyState } from '../components/ui'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 import { confirmAction } from '../store/confirmStore'
 import { useProject, useProjectStore } from '../store/projectStore'
 import { toast } from '../store/toastStore'
@@ -244,12 +261,134 @@ function Diagram({ project }: { project: Project }) {
   )
 }
 
+/** Стан історії змін: чи можна скасувати або повторити, і функції для цього. */
+function useUndoRedo() {
+  const temporal = useProjectStore.temporal
+  const canUndo = useStore(temporal, (s) => s.pastStates.length > 0)
+  const canRedo = useStore(temporal, (s) => s.futureStates.length > 0)
+  return {
+    canUndo,
+    canRedo,
+    undo: () => temporal.getState().undo(),
+    redo: () => temporal.getState().redo(),
+  }
+}
+
+/** Перегляд «списком» — зручний на телефоні, де працювати з полотном незручно. */
+function TableList({ project }: { project: Project }) {
+  const tableName = (id: string) => project.tables.find((t) => t.id === id)?.name ?? '?'
+  const colName = (tid: string, cid: string) =>
+    project.tables.find((t) => t.id === tid)?.columns.find((c) => c.id === cid)?.name ?? '?'
+  const fkColumnIds = new Set(project.relations.map((r) => r.fromColumnId))
+
+  if (project.tables.length === 0) {
+    return <EmptyState icon={<Table2 size={28} />} title="Схема поки порожня" text="Додайте першу таблицю кнопкою «Таблиця» вгорі." />
+  }
+
+  return (
+    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-6">
+      <section>
+        <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-500 uppercase">Таблиці ({project.tables.length})</h2>
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {project.tables.map((t) => (
+            <li key={t.id}>
+              <Link
+                to={`/project/${project.id}/table/${t.id}`}
+                className="block rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-indigo-300"
+              >
+                <div className={clsx('flex items-center gap-2 rounded-t-xl border-b px-4 py-2.5', tableColorClasses[t.color].header)}>
+                  <span className={clsx('size-2.5 rounded-full', tableColorClasses[t.color].dot)} />
+                  <span className="flex-1 truncate font-semibold">{t.name}</span>
+                  <Pencil size={15} className="text-slate-500" />
+                </div>
+                <ul className="px-4 py-2 text-sm">
+                  {t.columns.map((c) => (
+                    <li key={c.id} className="flex items-center gap-2 py-1">
+                      <span className="w-4">
+                        {c.primaryKey ? (
+                          <KeyRound size={13} className="text-amber-600" />
+                        ) : fkColumnIds.has(c.id) ? (
+                          <Link2 size={13} className="text-indigo-600" />
+                        ) : null}
+                      </span>
+                      <span className="flex-1 truncate text-slate-800">{c.name}</span>
+                      <span className="font-mono text-xs text-slate-500">{c.type.toLowerCase()}</span>
+                    </li>
+                  ))}
+                  {t.columns.length === 0 && <li className="py-1 text-slate-500 italic">немає колонок</li>}
+                </ul>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section>
+        <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-500 uppercase">Зв'язки ({project.relations.length})</h2>
+        {project.relations.length === 0 ? (
+          <p className="text-sm text-slate-600">Зв'язків ще немає. Додати зовнішній ключ можна на сторінці редагування таблиці.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {project.relations.map((r) => (
+              <li key={r.id} className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 font-mono text-xs text-slate-700">
+                {tableName(r.fromTableId)}.{colName(r.fromTableId, r.fromColumnId)} → {tableName(r.toTableId)}.
+                {colName(r.toTableId, r.toColumnId)}
+                {r.onDelete !== 'NO ACTION' && <span className="ml-2 text-slate-500">ON DELETE {r.onDelete}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  )
+}
+
 export function EditorPage() {
   const { projectId } = useParams()
   const project = useProject(projectId)
+  const navigate = useNavigate()
   const addTable = useProjectStore((s) => s.addTable)
+  const applyAutoLayout = useProjectStore((s) => s.applyAutoLayout)
+  const { canUndo, canRedo, undo, redo } = useUndoRedo()
+  const isMobile = useMediaQuery('(max-width: 767px)')
+  const [view, setView] = useState<'diagram' | 'list'>(() =>
+    window.matchMedia('(max-width: 767px)').matches ? 'list' : 'diagram',
+  )
+
+  // Історія «скасувати / повторити» — окрема для кожного відкриття схеми.
+  const openedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (projectId && openedFor.current !== projectId) {
+      openedFor.current = projectId
+      useProjectStore.temporal.getState().clear()
+    }
+  }, [projectId])
+
+  // Ctrl+Z — скасувати, Ctrl+Y або Ctrl+Shift+Z — повторити.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return
+      if ((e.target as HTMLElement).closest('input, textarea, select')) return
+      const key = e.key.toLowerCase()
+      if (key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        undo()
+      } else if (key === 'y' || (key === 'z' && e.shiftKey)) {
+        e.preventDefault()
+        redo()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [undo, redo])
 
   if (!project) return <NotFound what="Схему" />
+
+  const onAddTable = () => {
+    const id = addTable(project.id)
+    // У вигляді «Список» одразу відкриваємо нову таблицю, бо на діаграмі її не видно.
+    if (id && view === 'list') navigate(`/project/${project.id}/table/${id}`)
+    else toast('Таблицю додано. Двічі клацніть по ній, щоб редагувати.', 'info')
+  }
 
   return (
     <>
@@ -274,24 +413,67 @@ export function EditorPage() {
         }
       />
 
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 sm:px-6" role="toolbar" aria-label="Інструменти редактора">
-        <Button
-          variant="primary"
-          icon={<Plus size={16} />}
-          onClick={() => {
-            addTable(project.id)
-            toast('Таблицю додано. Двічі клацніть по ній, щоб редагувати.', 'info')
-          }}
-        >
+      <div
+        className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 sm:px-6"
+        role="toolbar"
+        aria-label="Інструменти редактора"
+      >
+        <Button variant="primary" icon={<Plus size={16} />} onClick={onAddTable}>
           Таблиця
         </Button>
+        <Button
+          icon={<LayoutGrid size={16} />}
+          disabled={project.tables.length < 2}
+          title="Автоматично розташувати таблиці"
+          onClick={() => {
+            applyAutoLayout(project.id)
+            setView('diagram')
+            toast('Таблиці впорядковано')
+          }}
+        >
+          <span className="hidden sm:inline">Впорядкувати</span>
+        </Button>
+        <div className="flex">
+          <Button variant="ghost" icon={<Undo2 size={16} />} onClick={undo} disabled={!canUndo} aria-label="Скасувати дію (Ctrl+Z)" title="Скасувати дію (Ctrl+Z)" />
+          <Button variant="ghost" icon={<Redo2 size={16} />} onClick={redo} disabled={!canRedo} aria-label="Повторити дію (Ctrl+Y)" title="Повторити дію (Ctrl+Y)" />
+        </div>
+        <div className="ml-auto flex rounded-lg border border-slate-300 bg-slate-50 p-0.5" role="group" aria-label="Вигляд">
+          {[
+            { v: 'diagram' as const, label: 'Діаграма', icon: <Network size={15} /> },
+            { v: 'list' as const, label: 'Список', icon: <List size={15} /> },
+          ].map((o) => (
+            <button
+              key={o.v}
+              type="button"
+              aria-pressed={view === o.v}
+              onClick={() => setView(o.v)}
+              className={clsx(
+                'inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 text-sm font-medium',
+                view === o.v ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900',
+              )}
+            >
+              {o.icon}
+              <span className="sr-only sm:not-sr-only">{o.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="relative min-h-0 flex-1">
-        <ReactFlowProvider>
-          <Diagram project={project} />
-        </ReactFlowProvider>
+      <div className={clsx('relative min-h-0 flex-1', view === 'list' && 'overflow-y-auto')}>
+        {view === 'diagram' ? (
+          <ReactFlowProvider>
+            <Diagram project={project} />
+          </ReactFlowProvider>
+        ) : (
+          <TableList project={project} />
+        )}
       </div>
+
+      {view === 'diagram' && isMobile && project.tables.length > 0 && (
+        <p className="flex shrink-0 items-center gap-2 border-t border-slate-200 bg-white px-4 py-2 text-xs text-slate-600">
+          <Workflow size={14} className="shrink-0" /> Масштабуйте двома пальцями. Для редагування зручніше перейти у «Список».
+        </p>
+      )}
     </>
   )
 }
