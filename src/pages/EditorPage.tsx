@@ -8,6 +8,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   useNodesState,
+  useReactFlow,
   type Connection,
   type Edge,
 } from '@xyflow/react'
@@ -28,7 +29,7 @@ import {
   Undo2,
   Workflow,
 } from 'lucide-react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { PageBar } from '../components/AppShell'
 import { NotFound } from '../components/NotFound'
 import { TableNode, type TableNodeType } from '../components/TableNode'
@@ -44,8 +45,10 @@ import { ON_DELETE_ACTIONS, type OnDeleteAction, type Project } from '../types'
 const nodeTypes = { table: TableNode }
 
 /** Діаграма: таблиці, які можна перетягувати, і зв'язки між ними. */
-function Diagram({ project }: { project: Project }) {
+function Diagram({ project, errorsByTable }: { project: Project; errorsByTable: Map<string, number> }) {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const { fitView } = useReactFlow()
   const moveTable = useProjectStore((s) => s.moveTable)
   const addRelation = useProjectStore((s) => s.addRelation)
   const deleteTable = useProjectStore((s) => s.deleteTable)
@@ -54,6 +57,7 @@ function Diagram({ project }: { project: Project }) {
 
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null)
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
+  const [highlightId, setHighlightId] = useState<string | null>(null)
 
   const openTable = useCallback(
     (tableId: string) => navigate(`/project/${project.id}/table/${tableId}`),
@@ -71,13 +75,35 @@ function Diagram({ project }: { project: Project }) {
         type: 'table',
         position: t.position,
         selected: t.id === selectedTableId,
-        data: { table: t, fkColumnIds, onOpen: openTable },
+        data: {
+          table: t,
+          fkColumnIds,
+          errorCount: errorsByTable.get(t.id) ?? 0,
+          highlighted: t.id === highlightId,
+          onOpen: openTable,
+        },
       })),
-    [project.tables, fkColumnIds, openTable, selectedTableId],
+    [project.tables, fkColumnIds, errorsByTable, highlightId, openTable, selectedTableId],
   )
 
   const [nodes, setNodes, onNodesChange] = useNodesState<TableNodeType>(buildNodes())
   useEffect(() => setNodes(buildNodes()), [buildNodes, setNodes])
+
+  // Перехід зі сторінки перевірки (адреса з ?focus=<id таблиці>): показати й підсвітити проблемну таблицю.
+  const focus = searchParams.get('focus')
+  useEffect(() => {
+    if (!focus) return
+    const show = window.setTimeout(() => {
+      setSelectedTableId(focus)
+      setHighlightId(focus)
+      void fitView({ nodes: [{ id: focus }], duration: 500, maxZoom: 1.2, padding: 0.6 })
+    }, 100)
+    const hide = window.setTimeout(() => setHighlightId(null), 2600)
+    return () => {
+      window.clearTimeout(show)
+      window.clearTimeout(hide)
+    }
+  }, [focus, fitView])
 
   // Зв'язки схеми → лінії діаграми.
   // Лінія йде від первинного ключа до зовнішнього ключа; стрілка вказує на таблицю, на яку посилаються.
@@ -276,7 +302,7 @@ function useUndoRedo() {
 }
 
 /** Перегляд «списком» — зручний на телефоні, де працювати з полотном незручно. */
-function TableList({ project }: { project: Project }) {
+function TableList({ project, errorsByTable }: { project: Project; errorsByTable: Map<string, number> }) {
   const tableName = (id: string) => project.tables.find((t) => t.id === id)?.name ?? '?'
   const colName = (tid: string, cid: string) =>
     project.tables.find((t) => t.id === tid)?.columns.find((c) => c.id === cid)?.name ?? '?'
@@ -300,6 +326,11 @@ function TableList({ project }: { project: Project }) {
                 <div className={clsx('flex items-center gap-2 rounded-t-xl border-b px-4 py-2.5', tableColorClasses[t.color].header)}>
                   <span className={clsx('size-2.5 rounded-full', tableColorClasses[t.color].dot)} />
                   <span className="flex-1 truncate font-semibold">{t.name}</span>
+                  {(errorsByTable.get(t.id) ?? 0) > 0 && (
+                    <Badge tone="red">
+                      <AlertTriangle size={12} /> {errorsByTable.get(t.id)}
+                    </Badge>
+                  )}
                   <Pencil size={15} className="text-slate-500" />
                 </div>
                 <ul className="px-4 py-2 text-sm">
@@ -385,6 +416,13 @@ export function EditorPage() {
   const issues = useMemo(() => (project ? validateProject(project) : []), [project])
   const counts = countBySeverity(issues)
 
+  // Скільки помилок у кожній таблиці: id таблиці → кількість.
+  const errorsByTable = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const i of issues) if (i.severity === 'error' && i.tableId) m.set(i.tableId, (m.get(i.tableId) ?? 0) + 1)
+    return m
+  }, [issues])
+
   if (!project) return <NotFound what="Схему" />
 
   const onAddTable = () => {
@@ -469,10 +507,10 @@ export function EditorPage() {
       <div className={clsx('relative min-h-0 flex-1', view === 'list' && 'overflow-y-auto')}>
         {view === 'diagram' ? (
           <ReactFlowProvider>
-            <Diagram project={project} />
+            <Diagram project={project} errorsByTable={errorsByTable} />
           </ReactFlowProvider>
         ) : (
-          <TableList project={project} />
+            <TableList project={project} errorsByTable={errorsByTable} />
         )}
       </div>
 

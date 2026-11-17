@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import clsx from 'clsx'
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
-import { KeyRound, Link2, Pencil } from 'lucide-react'
+import { AlertTriangle, KeyRound, Link2, Pencil } from 'lucide-react'
 import type { Table } from '../types'
 import { NODE_WIDTH } from '../lib/layout'
 import { tableColorClasses } from './styles'
@@ -10,6 +10,8 @@ import { tableColorClasses } from './styles'
 export type TableNodeData = {
   table: Table
   fkColumnIds: Set<string>
+  errorCount: number
+  highlighted: boolean
   onOpen: (tableId: string) => void
 }
 
@@ -17,7 +19,7 @@ export type TableNodeType = Node<TableNodeData, 'table'>
 
 /** Вузол діаграми — одна таблиця бази даних. У кожної колонки є точки для з'єднання зв'язком. */
 function TableNodeView({ data, selected }: NodeProps<TableNodeType>) {
-  const { table, fkColumnIds, onOpen } = data
+  const { table, fkColumnIds, errorCount, highlighted, onOpen } = data
   const colors = tableColorClasses[table.color]
 
   return (
@@ -26,6 +28,7 @@ function TableNodeView({ data, selected }: NodeProps<TableNodeType>) {
       className={clsx(
         'rounded-xl border bg-white shadow-sm transition-shadow',
         selected ? 'border-indigo-500 shadow-md ring-2 ring-indigo-200' : 'border-slate-300',
+        highlighted && 'ring-4 ring-rose-300',
       )}
       onDoubleClick={() => onOpen(table.id)}
     >
@@ -34,6 +37,11 @@ function TableNodeView({ data, selected }: NodeProps<TableNodeType>) {
         <span className="min-w-0 flex-1 truncate font-semibold" title={table.name}>
           {table.name}
         </span>
+        {errorCount > 0 && (
+          <span title={`Помилок: ${errorCount}`} className="flex items-center gap-0.5 text-xs font-semibold text-rose-700">
+            <AlertTriangle size={14} /> {errorCount}
+          </span>
+        )}
         <button
           type="button"
           onClick={() => onOpen(table.id)}
