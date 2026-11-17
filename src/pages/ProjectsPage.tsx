@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { FolderOpen, Link2, Pencil, Plus, Sparkles, Table2, Trash2 } from 'lucide-react'
+import { useMemo, useState, useRef } from 'react'
+import { FolderOpen, Link2, Pencil, Plus, Sparkles, Table2, Trash2, Download, Upload } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { PageBar } from '../components/AppShell'
 import { Modal } from '../components/Modal'
@@ -10,6 +10,8 @@ import { confirmAction } from '../store/confirmStore'
 import { useProjectStore } from '../store/projectStore'
 import { toast } from '../store/toastStore'
 import type { Project } from '../types'
+import { downloadFile, safeFileName } from '../lib/download'
+import { exportProjectJson, importProjectJson, MAX_IMPORT_BYTES } from '../lib/importExport'
 
 const MAX_PROJECT_NAME = 100
 
@@ -65,6 +67,18 @@ function ProjectCard({ project, onRename }: { project: Project; onRename: () => 
         </Button>
         <Button
           variant="ghost"
+          className="flex-1"
+          icon={<Download size={15} />}
+          aria-label={`Експортувати ${project.name}`}
+          onClick={() => {
+            downloadFile(`${safeFileName(project.name)}.schemacraft.json`, exportProjectJson(project), 'application/json')
+            toast('Файл схеми завантажено')
+          }}
+        >
+          <span className="hidden sm:inline">Експорт</span>
+        </Button>
+        <Button
+          variant="ghost"
           className="flex-1 hover:!bg-rose-50 hover:!text-rose-700"
           icon={<Trash2 size={15} />}
           onClick={() => void onDelete()}
@@ -84,7 +98,24 @@ export function ProjectsPage() {
   const projects = useProjectStore((s) => s.projects)
   const createProject = useProjectStore((s) => s.createProject)
   const renameProject = useProjectStore((s) => s.renameProject)
+  const addImportedProject = useProjectStore((s) => s.addImportedProject)
   const navigate = useNavigate()
+  const fileInput = useRef<HTMLInputElement>(null)
+
+  const onImport = async (file: File | undefined) => {
+    if (!file) return
+    if (file.size > MAX_IMPORT_BYTES) {
+      toast('Файл завеликий (максимум 1 МБ)', 'error')
+      return
+    }
+    const result = importProjectJson(await file.text())
+    if (!result.ok) {
+      toast(result.error, 'error')
+      return
+    }
+    addImportedProject(result.project)
+    toast(`Схему «${result.project.name}» імпортовано`)
+  }
 
   const [dialog, setDialog] = useState<NameDialog>(null)
   const [name, setName] = useState('')
@@ -128,11 +159,27 @@ export function ProjectsPage() {
         crumbs={[{ label: 'Мої схеми' }]}
         actions={
           projects.length > 0 && (
-            <Button variant="primary" icon={<Plus size={16} />} onClick={() => openCreate()}>
-              Нова схема
-            </Button>
+            <>
+              <Button icon={<Upload size={16} />} onClick={() => fileInput.current?.click()}>
+                Імпорт
+              </Button>
+              <Button variant="primary" icon={<Plus size={16} />} onClick={() => openCreate()}>
+                Нова схема
+              </Button>
+            </>
           )
         }
+      />
+      <input
+        ref={fileInput}
+        type="file"
+        accept=".json,application/json"
+        className="hidden"
+        aria-label="Файл схеми для імпорту"
+        onChange={(e) => {
+          void onImport(e.target.files?.[0])
+          e.target.value = ''
+        }}
       />
 
       <div className="flex-1 overflow-y-auto">
@@ -148,6 +195,9 @@ export function ProjectsPage() {
                 </Button>
                 <Button icon={<Sparkles size={16} />} onClick={() => openCreate(true)}>
                   Відкрити приклад
+                </Button>
+                <Button variant="ghost" icon={<Upload size={16} />} onClick={() => fileInput.current?.click()}>
+                  Імпортувати файл
                 </Button>
               </>
             }
