@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import clsx from 'clsx'
 import {
   Background,
@@ -374,6 +374,9 @@ function TableList({ project, errorsByTable }: { project: Project; errorsByTable
   )
 }
 
+/** Яку схему відкривали в редакторі останньою — живе поза компонентом, тому не зникає при переходах між сторінками. */
+let lastOpenedProjectId: string | null = null
+
 export function EditorPage() {
   const { projectId } = useParams()
   const project = useProject(projectId)
@@ -386,11 +389,10 @@ export function EditorPage() {
     window.matchMedia('(max-width: 767px)').matches ? 'list' : 'diagram',
   )
 
-  // Історія «скасувати / повторити» — окрема для кожного відкриття схеми.
-  const openedFor = useRef<string | null>(null)
+  // Історія «скасувати / повторити» очищується лише тоді, коли відкрито іншу схему.
   useEffect(() => {
-    if (projectId && openedFor.current !== projectId) {
-      openedFor.current = projectId
+    if (projectId && lastOpenedProjectId !== projectId) {
+      lastOpenedProjectId = projectId
       useProjectStore.temporal.getState().clear()
     }
   }, [projectId])
