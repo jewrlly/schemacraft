@@ -1,3 +1,5 @@
+/// <reference types="vitest/config" />
+
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, type Plugin } from 'vite'
@@ -33,5 +35,8 @@ export default defineConfig({
   build: {
     // Підтримувані браузери: Chrome, Edge, Firefox, Safari приблизно з 2022 року
     target: ['chrome107', 'edge107', 'firefox104', 'safari16'],
+  },
+  test: {
+    include: ['src/**/*.test.ts'],
   },
 })
